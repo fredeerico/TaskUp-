@@ -1,0 +1,39 @@
+# Blueprint do Render (New > Blueprint): banco, API e site do app.
+#
+#   taskup-api  ->  https://taskup-api.onrender.com   (Django + Gunicorn)
+#   taskup-web  ->  https://taskup-web.onrender.com   (Flutter Web em web_dist/)
+#
+# Se o Render der outra URL a algum serviço, ajuste CORS_ALLOWED_ORIGINS
+# (na API) e rode build_web.ps1 -ApiUrl <URL da API>. Veja o DEPLOY.md.
+
+databases:
+  - name: taskup-db
+    plan: free
+    databaseName: taskup
+    user: taskup
+
+services:
+  - type: web
+    name: taskup-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --no-input && python manage.py migrate
+    startCommand: python -m gunicorn config.wsgi:application
+    healthCheckPath: /api/docs/
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: taskup-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://taskup-web.onrender.com
+      - key: WEB_CONCURRENCY
+        value: 2
+
+  - type: web
+    name: taskup-web
+    runtime: static
+    buildCommand: echo "App ja compilado em web_dist (build_web.ps1)"
+    staticPublishPath: ./web_dist

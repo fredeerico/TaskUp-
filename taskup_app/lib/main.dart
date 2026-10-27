@@ -9,6 +9,7 @@ import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'state/session.dart';
 import 'state/task_store.dart';
+import 'widgets/common.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +42,15 @@ class TaskUpApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       home: const _AuthGate(),
+      // Aviso "servidor iniciando" por cima de qualquer tela.
+      builder: (context, child) => Stack(
+        children: [
+          child!,
+          AvisoServidorIniciando(
+            ativo: context.read<Session>().api.servidorIniciando,
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,24 +1,54 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../core/api_client.dart';
 import '../models/categoria.dart';
 import '../models/tarefa.dart';
 
-void showMessage(BuildContext context, String msg, {bool error = false}) {
-  final scheme = Theme.of(context).colorScheme;
+/// Mensagem rápida de sucesso/informação (barra discreta no rodapé).
+/// Para erros, use [mostrarErro].
+void showMessage(BuildContext context, String msg) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: error ? scheme.errorContainer : null,
-        showCloseIcon: true,
-        closeIconColor: error ? scheme.onErrorContainer : null,
-      ),
-    );
+    ..showSnackBar(SnackBar(content: Text(msg), showCloseIcon: true));
 }
 
-/// Executa uma ação assíncrona mostrando erro em SnackBar se falhar.
+/// Texto amigável para qualquer erro: mensagens da API são exibidas como
+/// vieram; erros internos viram uma frase genérica.
+String mensagemDeErro(Object erro) => erro is ApiException
+    ? erro.message
+    : 'Ocorreu um erro inesperado. Tente novamente.';
+
+/// Pop-up de erro com botão OK, no mesmo estilo das demais telas.
+Future<void> mostrarErro(
+  BuildContext context,
+  Object erro, {
+  String titulo = 'Não foi possível concluir',
+}) {
+  final scheme = Theme.of(context).colorScheme;
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      icon: Icon(Icons.error_outline_rounded, color: scheme.error, size: 32),
+      title: Text(titulo, textAlign: TextAlign.center),
+      content: Text(
+        erro is String ? erro : mensagemDeErro(erro),
+        textAlign: TextAlign.center,
+      ),
+      actionsAlignment: MainAxisAlignment.center,
+      actions: [
+        FilledButton(
+          style: FilledButton.styleFrom(minimumSize: const Size(120, 44)),
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('OK'),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Executa uma ação assíncrona; se falhar, mostra o pop-up de erro.
 Future<bool> runSafely(
   BuildContext context,
   Future<void> Function() action, {
@@ -29,8 +59,82 @@ Future<bool> runSafely(
     if (success != null && context.mounted) showMessage(context, success);
     return true;
   } catch (e) {
-    if (context.mounted) showMessage(context, e.toString(), error: true);
+    if (context.mounted) await mostrarErro(context, e);
     return false;
+  }
+}
+
+/// Aviso exibido por cima do app enquanto a API demora a responder
+/// (servidor gratuito acordando). Some sozinho quando a resposta chega.
+class AvisoServidorIniciando extends StatelessWidget {
+  const AvisoServidorIniciando({super.key, required this.ativo});
+
+  final ValueListenable<bool> ativo;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return ValueListenableBuilder<bool>(
+      valueListenable: ativo,
+      builder: (context, visivel, _) => IgnorePointer(
+        ignoring: !visivel,
+        child: AnimatedOpacity(
+          opacity: visivel ? 1 : 0,
+          duration: const Duration(milliseconds: 200),
+          child: Stack(
+            children: [
+              ModalBarrier(
+                dismissible: false,
+                color: scheme.scrim.withValues(alpha: 0.55),
+              ),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 380),
+                    child: Material(
+                      color: scheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(28),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(28, 32, 28, 28),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 3.5,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              'Aguarde um instante',
+                              style: theme.textTheme.headlineSmall,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'O servidor está iniciando, isso pode levar até '
+                              '1 minuto…',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

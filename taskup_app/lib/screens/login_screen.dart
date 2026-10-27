@@ -28,7 +28,11 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && context.read<Session>().sessionExpired) {
-        showMessage(context, 'Sua sessão expirou. Entre novamente.');
+        mostrarErro(
+          context,
+          'Por segurança, entre novamente na sua conta.',
+          titulo: 'Sessão expirada',
+        );
       }
     });
   }
@@ -59,7 +63,15 @@ class _LoginScreenState extends State<LoginScreen> {
         await session.login(_username.text, _password.text);
       }
     } catch (e) {
-      if (mounted) showMessage(context, e.toString(), error: true);
+      if (mounted) {
+        await mostrarErro(
+          context,
+          e,
+          titulo: _cadastro
+              ? 'Não foi possível criar a conta'
+              : 'Não foi possível entrar',
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }

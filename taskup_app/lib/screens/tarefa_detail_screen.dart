@@ -20,7 +20,7 @@ class TarefaDetailScreen extends StatefulWidget {
 class _TarefaDetailScreenState extends State<TarefaDetailScreen> {
   final _novaSub = TextEditingController();
   bool _carregandoSubs = true;
-  String? _erroSubs;
+  bool _falhaSubs = false;
 
   @override
   void initState() {
@@ -37,12 +37,19 @@ class _TarefaDetailScreenState extends State<TarefaDetailScreen> {
   Future<void> _carregarSubs() async {
     setState(() {
       _carregandoSubs = true;
-      _erroSubs = null;
+      _falhaSubs = false;
     });
     try {
       await context.read<TaskStore>().carregarSubtarefas(widget.tarefaId);
     } catch (e) {
-      _erroSubs = e.toString();
+      _falhaSubs = true;
+      if (mounted) {
+        mostrarErro(
+          context,
+          e,
+          titulo: 'Não foi possível carregar as subtarefas',
+        );
+      }
     }
     if (mounted) setState(() => _carregandoSubs = false);
   }
@@ -252,13 +259,13 @@ class _TarefaDetailScreenState extends State<TarefaDetailScreen> {
                   padding: EdgeInsets.all(16),
                   child: Center(child: CircularProgressIndicator()),
                 )
-              else if (_erroSubs != null)
-                ListTile(
-                  leading: Icon(Icons.error_outline, color: scheme.error),
-                  title: Text(_erroSubs!),
-                  trailing: IconButton(
+              else if (_falhaSubs)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
                     onPressed: _carregarSubs,
                     icon: const Icon(Icons.refresh),
+                    label: const Text('Tentar carregar novamente'),
                   ),
                 )
               else

@@ -97,12 +97,15 @@ class PerfilTab extends StatelessWidget {
                       title: const Text('Sincronizar agora'),
                       onTap: () async {
                         await store.load();
-                        if (context.mounted) {
-                          showMessage(
+                        if (!context.mounted) return;
+                        if (store.error != null) {
+                          mostrarErro(
                             context,
-                            store.error ?? 'Dados atualizados',
-                            error: store.error != null,
+                            store.error!,
+                            titulo: 'Não foi possível sincronizar',
                           );
+                        } else {
+                          showMessage(context, 'Dados atualizados');
                         }
                       },
                     ),

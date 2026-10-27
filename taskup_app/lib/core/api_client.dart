@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show VoidCallback;
+import 'package:flutter/foundation.dart' show ValueNotifier, VoidCallback;
 import 'package:http/http.dart' as http;
 
 /// Erro amigável vindo da API (já com a mensagem pronta para exibir).
@@ -30,7 +30,14 @@ class ApiClient {
   /// Chamado quando a API responde 401 (token inválido/expirado).
   VoidCallback? onUnauthorized;
 
-  static const _timeout = Duration(seconds: 15);
+  /// Fica `true` enquanto alguma requisição demora mais que [_avisoLento].
+  /// No plano gratuito do Render, a API "dorme" e leva até ~1 min para
+  /// acordar; a interface mostra um aviso enquanto isso.
+  final ValueNotifier<bool> servidorIniciando = ValueNotifier(false);
+  int _lentas = 0;
+
+  static const _timeout = Duration(seconds: 90);
+  static const _avisoLento = Duration(seconds: 4);
 
   /// Endereço padrão da API. Em produção é definido no build:
   /// `flutter build web --dart-define=API_URL=https://taskup-api.onrender.com`
@@ -74,20 +81,30 @@ class ApiClient {
       _send(() => http.delete(_uri(path), headers: _headers));
 
   Future<dynamic> _send(Future<http.Response> Function() request) async {
+    var lenta = false;
+    final aviso = Timer(_avisoLento, () {
+      lenta = true;
+      _lentas++;
+      servidorIniciando.value = true;
+    });
+
     http.Response res;
     try {
       res = await request().timeout(_timeout);
     } on TimeoutException {
       throw ApiException(
-        'O servidor demorou para responder. Verifique o endereço da API.',
+        'O servidor não respondeu a tempo. Aguarde alguns instantes e tente '
+        'novamente.',
       );
     } catch (_) {
       // No navegador, falhas de CORS também caem aqui (sem detalhes).
       throw ApiException(
-        'Não foi possível conectar à API em $baseUrl. '
-        'Verifique se o Django está rodando e se o CORS está liberado '
-        'para este endereço.',
+        'Não foi possível conectar ao servidor. Verifique sua conexão com a '
+        'internet e tente novamente.',
       );
+    } finally {
+      aviso.cancel();
+      if (lenta && --_lentas == 0) servidorIniciando.value = false;
     }
 
     final text = utf8.decode(res.bodyBytes);
